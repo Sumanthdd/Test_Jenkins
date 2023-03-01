@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:compatibility="http://www.mulesoft.org/schema/mule/compatibility" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/compatibility http://www.mulesoft.org/schema/mule/compatibility/current/mule-compatibility.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+
+    <http:listener-config name="HTTP_Listener_Configuration" doc:name="HTTP Listener Configuration">
+        <http:listener-connection host="0.0.0.0" port="8102" />
+    </http:listener-config>
+
+    <db:config name="Database_Config" doc:name="Database Config" doc:id="6ce5d71c-9309-498b-82c9-a5d2faa0c20c" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" database="tm" />
+	</db:config>
+	<flow name="test-mule-3-to-4Flow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/mule3" doc:name="/mule3">
+            <http:response statusCode="#[migration::HttpListener::httpListenerResponseSuccessStatusCode(vars)]">
+                <!--Migration WARN: Avoid using an outbound property to determine the status code.-->
+                <!--    For more information refer to:-->
+                <!--        * https://github.com/mulesoft/mule-migration-assistant/blob/master/docs/user-docs/migration-tool-post-mig.adoc#outbound_properties-->
+                <http:headers>#[migration::HttpListener::httpListenerResponseHeaders(vars)]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.statusCode default migration::HttpListener::httpListenerResponseErrorStatusCode(vars)]">
+                <!--Migration WARN: Avoid using an outbound property to determine the status code.-->
+                <!--    For more information refer to:-->
+                <!--        * https://github.com/mulesoft/mule-migration-assistant/blob/master/docs/user-docs/migration-tool-post-mig.adoc#outbound_properties-->
+                <http:headers>#[migration::HttpListener::httpListenerResponseHeaders(vars)]</http:headers>
+            </http:error-response>
+        </http:listener>
+
+        <ee:transform doc:name="Transform Message">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json  
+---
+{
+	"ID" : "1234",
+	"Name" : "shekar",
+	"Phone" : "235414",
+	"Email" : "sdhjfd@gksn.com"
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+		<db:stored-procedure doc:name="Stored procedure" doc:id="3bbf3fce-14c9-4075-aa04-2f470ccf3f1f" config-ref="Database_Config">
+			<db:sql ><![CDATA[call mule(:ID,:Name,:Phone,:Email)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	"ID" : payload.ID,
+	"Name" : payload.Name,
+	"Phone" : payload.Phone,
+	"Email" : payload.Email
+}]]]></db:input-parameters>
+		</db:stored-procedure>
+
+    </flow>
+
+</mule>
